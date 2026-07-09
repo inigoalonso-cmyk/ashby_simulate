@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ashby Dashboard — Sandbox</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">
+      <strong>Ashby Dashboard</strong>
+      <span class="badge">SANDBOX — does not touch real Ashby</span>
+    </div>
+    <div class="topbar-actions">
+      <select id="jobSelect"><option value="">Loading jobs…</option></select>
+      <button id="addCandidateBtn">+ Add test candidate</button>
+    </div>
+  </header>
+
+  <main id="board" class="board"></main>
+
+  <!-- Add candidate modal -->
+  <div id="addCandidateModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Apply as a test candidate</h2>
+      <p class="hint">Fill this in as if you were applying yourself. As soon as you submit, Prescreen runs automatically — and if it passes, the Agent Interview chat opens right away.</p>
+      <label>Name<input id="cName" type="text" placeholder="Iñigo Alonso" /></label>
+      <label>Email (optional)<input id="cEmail" type="text" placeholder="you@company.com" /></label>
+      <label>Phone (optional)<input id="cPhone" type="text" placeholder="+34 600 000 000" /></label>
+      <label>Job<select id="cJob"></select></label>
+      <label>Profile / résumé / answers (free text)
+        <textarea id="cProfile" rows="10" placeholder="Paste résumé text, application answers, notes — whatever the AI should evaluate."></textarea>
+      </label>
+      <div class="modal-actions">
+        <button class="secondary" data-close>Cancel</button>
+        <button id="saveCandidateBtn">Submit application</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prescreen result modal -->
+  <div id="prescreenModal" class="modal hidden">
+    <div class="modal-content wide">
+      <h2>Prescreen result</h2>
+      <div id="prescreenBody"></div>
+      <div class="modal-actions"><button class="secondary" data-close>Close</button></div>
+    </div>
+  </div>
+
+  <!-- Interview chat modal -->
+  <div id="interviewModal" class="modal hidden">
+    <div class="modal-content wide">
+      <h2>Agent Interview — <span id="interviewCandidateName"></span></h2>
+      <p class="hint">You're playing the candidate. Type answers as if Carlos (the AI recruiter) is asking you.</p>
+      <div id="chatLog" class="chat-log"></div>
+      <div class="chat-input-row">
+        <input id="chatInput" type="text" placeholder="Type your answer as the candidate…" />
+        <button id="chatSendBtn">Send</button>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-close>Close</button>
+        <button id="finishInterviewBtn">Finish &amp; judge</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Handoff draft modal -->
+  <div id="handoffModal" class="modal hidden">
+    <div class="modal-content wide">
+      <h2>Recruiter handoff (draft — nothing is sent automatically)</h2>
+      <div id="handoffBody"></div>
+      <div class="modal-actions"><button class="secondary" data-close>Close</button></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
