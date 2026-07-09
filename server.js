@@ -83,11 +83,11 @@ router.get('/api/candidates', async (req, res) => {
 
 router.post('/api/candidates', async (req, res) => {
   const body = await readBody(req);
-  const { name, email, phone, job_id, job_name, profile_text, source } = body;
-  if (!name || !job_id || !job_name || !profile_text) {
-    return fail(res, new Error('name, job_id, job_name and profile_text are required'), 400);
+  const { name, email, phone, job_id, job_name, profile_text, resume_url, source } = body;
+  if (!name || !job_id || !job_name || (!profile_text && !resume_url)) {
+    return fail(res, new Error('name, job_id, job_name and (profile_text or resume_url) are required'), 400);
   }
-  ok(res, db.createCandidate({ name, email, phone, job_id, job_name, profile_text, source }));
+  ok(res, db.createCandidate({ name, email, phone, job_id, job_name, profile_text, resume_url, source }));
 });
 
 router.get('/api/candidates/:id', async (req, res, params) => {
@@ -124,7 +124,7 @@ router.get('/api/workflow/applications', async (req, res, params, query) => {
   const stage = query.get('stage') || 'applied';
   const rows = db.listCandidates({ stage }).map((c) => ({
     id: c.id, name: c.name, email: c.email, phone: c.phone,
-    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, stage: c.stage,
+    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, resume_url: c.resume_url, stage: c.stage,
   }));
   ok(res, rows);
 });
@@ -136,7 +136,7 @@ router.get('/api/workflow/candidates/:id', async (req, res, params) => {
   if (!c) return fail(res, new Error('not found'), 404);
   ok(res, {
     id: c.id, name: c.name, email: c.email, phone: c.phone,
-    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, stage: c.stage,
+    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, resume_url: c.resume_url, stage: c.stage,
   });
 });
 

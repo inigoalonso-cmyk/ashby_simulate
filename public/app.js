@@ -130,8 +130,9 @@ $('#saveCandidateBtn').addEventListener('click', async () => {
   const job_id = jobSelect.value;
   const job_name = jobSelect.selectedOptions[0]?.dataset.name || '';
   const profile_text = $('#cProfile').value.trim();
-  if (!name || !job_id || !profile_text) {
-    alert('Name, job and profile text are required.');
+  const resume_url = $('#cResumeUrl').value.trim();
+  if (!name || !job_id || (!profile_text && !resume_url)) {
+    alert('Name, job, and either a résumé URL or profile text are required.');
     return;
   }
   const saveBtn = $('#saveCandidateBtn');
@@ -140,9 +141,9 @@ $('#saveCandidateBtn').addEventListener('click', async () => {
     const candidate = await api('/api/candidates', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, job_id, job_name, profile_text, source: 'manual' }),
+      body: JSON.stringify({ name, email, phone, job_id, job_name, profile_text, resume_url, source: 'manual' }),
     });
-    $('#cName').value = ''; $('#cEmail').value = ''; $('#cPhone').value = ''; $('#cProfile').value = '';
+    $('#cName').value = ''; $('#cEmail').value = ''; $('#cPhone').value = ''; $('#cProfile').value = ''; $('#cResumeUrl').value = '';
     closeModal('#addCandidateModal');
     await loadCandidates();
     // Simulate "just applied" — run Prescreen immediately, no manual click needed.

@@ -33,10 +33,11 @@ function listCandidates(filter) {
   return rows.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 }
 
-function createCandidate({ name, email, phone, job_id, job_name, profile_text, source }) {
+function createCandidate({ name, email, phone, job_id, job_name, profile_text, resume_url, source }) {
   const now = new Date().toISOString();
   const candidate = {
-    id: uuid(), name, email: email || null, phone: phone || null, job_id, job_name, profile_text,
+    id: uuid(), name, email: email || null, phone: phone || null, job_id, job_name,
+    profile_text: profile_text || null, resume_url: resume_url || null,
     stage: 'applied', source: source || 'manual', created_at: now, updated_at: now,
   };
   state.candidates.push(candidate);
