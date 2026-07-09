@@ -1,0 +1,9 @@
+My dashboard's candidate objects now include an optional `resume_url` field alongside `profile_text` (real candidates will typically have `resume_url` pointing at a PDF/doc, since that's how they'll come from the actual export; `profile_text` will mostly be used for hand-typed test candidates). The current loop item's `candidate` variable will now include `candidate.resume_url` (string or null) in addition to the fields we already wired.
+
+Please add back a file-parsing step in the Loop, right after we get the candidate, that:
+1. Only runs when `candidate.resume_url` is present (add a Paths/condition branching on whether it's set).
+2. If present, parses `candidate.resume_url` into text (use the same built-in Parse file action type we deleted earlier, just pointed at this new field instead of the old Ashby one).
+3. Feeds that parsed text into 'Format Criteria and Candidate' as `cv_text` instead of `candidate.profile_text`.
+4. If `resume_url` is NOT present, skip parsing and use `candidate.profile_text` as `cv_text` like it does now.
+
+Show me the plan before building it.
