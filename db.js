@@ -27,8 +27,10 @@ function persist() { save(state); }
 
 // ---------- candidates ----------
 
-function listCandidates() {
-  return [...state.candidates].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+function listCandidates(filter) {
+  let rows = [...state.candidates];
+  if (filter && filter.stage) rows = rows.filter((c) => c.stage === filter.stage);
+  return rows.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 }
 
 function createCandidate({ name, email, phone, job_id, job_name, profile_text, source }) {

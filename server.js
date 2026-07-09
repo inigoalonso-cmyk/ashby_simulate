@@ -111,7 +111,89 @@ router.patch('/api/candidates/:id/stage', async (req, res, params) => {
   ok(res, db.updateCandidateStage(params.id, body.stage));
 });
 
-// ---------- Layer 1: Prescreening ----------
+// ---------- Workflow-facing endpoints ----------
+// These exist so the REAL HappyRobot workflows can use this dashboard as
+// their data source/sink instead of Ashby. No Ashby credential, no Ashby
+// action node, no risk to any real pipeline — the workflow does its own
+// thinking (its own Scoring Agent / interview agent) and just reads
+// candidates from here and reports results back here.
+
+// Equivalent of Ashby's "List Applications (Intake Stage Only)".
+// GET /api/workflow/applications?stage=applied
+router.get('/api/workflow/applications', async (req, res, params, query) => {
+  const stage = query.get('stage') || 'applied';
+  const rows = db.listCandidates({ stage }).map((c) => ({
+    id: c.id, name: c.name, email: c.email, phone: c.phone,
+    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, stage: c.stage,
+  }));
+  ok(res, rows);
+});
+
+// Equivalent of Ashby's "Get Application" + "Get Candidate" combined —
+// this dashboard doesn't separate the two, one record has everything.
+router.get('/api/workflow/candidates/:id', async (req, res, params) => {
+  const c = db.getCandidate(params.id);
+  if (!c) return fail(res, new Error('not found'), 404);
+  ok(res, {
+    id: c.id, name: c.name, email: c.email, phone: c.phone,
+    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, stage: c.stage,
+  });
+});
+
+// Equivalent of "Submit Score" + "Branch on Result" + "Advance to
+// Interview"/"Archive Application" all in one call. The workflow does its
+// own scoring (its own Scoring Agent node calls its own LLM) and just posts
+// the result here; this endpoint decides pass/fail using HappyRecruiting's
+// pass_threshold and updates the local stage accordingly.
+// POST /api/workflow/candidates/:id/prescreen-result
+// body: { score: number, rationale: string }
+router.post('/api/workflow/candidates/:id/prescreen-result', async (req, res, params) => {
+  try {
+    const candidate = db.getCandidate(params.id);
+    if (!candidate) return fail(res, new Error('not found'), 404);
+    const body = await readBody(req);
+    if (typeof body.score !== 'number') return fail(res, new Error('score (number) is required'), 400);
+
+    const settings = await hr.getSettings();
+    const passThreshold = settings.pass_threshold ?? 8;
+    const passed = body.score >= passThreshold;
+
+    const evaluation = db.addEvaluation(candidate.id, 'prescreen', passed, {
+      score: body.score,
+      rationale: body.rationale || null,
+      pass_threshold: passThreshold,
+      source: 'real_workflow',
+    });
+    const newStage = passed ? 'prescreen_passed' : 'prescreen_rejected';
+    db.updateCandidateStage(candidate.id, newStage);
+
+    ok(res, { evaluation, stage: newStage, pass_threshold: passThreshold });
+  } catch (e) { fail(res, e); }
+});
+
+// Same pattern for the Agent Interview workflow, once we wire that one too.
+// POST /api/workflow/candidates/:id/interview-result
+// body: { passed: boolean, rationale: string, question_results: [...] }
+router.post('/api/workflow/candidates/:id/interview-result', async (req, res, params) => {
+  try {
+    const candidate = db.getCandidate(params.id);
+    if (!candidate) return fail(res, new Error('not found'), 404);
+    const body = await readBody(req);
+    if (typeof body.passed !== 'boolean') return fail(res, new Error('passed (boolean) is required'), 400);
+
+    const evaluation = db.addEvaluation(candidate.id, 'interview', body.passed, {
+      rationale: body.rationale || null,
+      question_results: body.question_results || [],
+      source: 'real_workflow',
+    });
+    const newStage = body.passed ? 'interview_passed' : 'interview_failed';
+    db.updateCandidateStage(candidate.id, newStage);
+
+    ok(res, { evaluation, stage: newStage });
+  } catch (e) { fail(res, e); }
+});
+
+// ---------- Layer 1: Prescreening (local standalone testing, uses this sandbox's own Claude key) ----------
 
 router.post('/api/candidates/:id/prescreen', async (req, res, params) => {
   try {
@@ -261,7 +343,7 @@ const server = http.createServer(async (req, res) => {
     const match = router.match(req.method, pathname);
     if (!match) return fail(res, new Error('not found'), 404);
     try {
-      await match.handler(req, res, match.params);
+      await match.handler(req, res, match.params, url.searchParams);
     } catch (e) {
       fail(res, e);
     }
