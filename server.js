@@ -118,19 +118,24 @@ router.patch('/api/candidates/:id/stage', async (req, res, params) => {
 // thinking (its own Scoring Agent / interview agent) and just reads
 // candidates from here and reports results back here.
 
-// Equivalent of Ashby's "List Applications (Intake Stage Only)".
+// Equivalent of Ashby's "List Applications (Intake Stage Only)" — deliberately
+// LIGHTWEIGHT, same as real Ashby: no profile_text/resume_url/email/phone
+// here. The workflow must call "Get Candidate" per item to get the full
+// record (including the CV link), exactly like it will have to do against
+// real Ashby later. Do not add those fields back here.
 // GET /api/workflow/applications?stage=applied
 router.get('/api/workflow/applications', async (req, res, params, query) => {
   const stage = query.get('stage') || 'applied';
   const rows = db.listCandidates({ stage }).map((c) => ({
-    id: c.id, name: c.name, email: c.email, phone: c.phone,
-    job_id: c.job_id, job_name: c.job_name, profile_text: c.profile_text, resume_url: c.resume_url, stage: c.stage,
+    id: c.id, name: c.name, job_id: c.job_id, job_name: c.job_name, stage: c.stage,
   }));
   ok(res, rows);
 });
 
 // Equivalent of Ashby's "Get Application" + "Get Candidate" combined —
-// this dashboard doesn't separate the two, one record has everything.
+// this dashboard doesn't separate the two, one record has everything,
+// INCLUDING resume_url/profile_text. This is the only place the workflow
+// can get the CV link — intentionally not available from the list endpoint.
 router.get('/api/workflow/candidates/:id', async (req, res, params) => {
   const c = db.getCandidate(params.id);
   if (!c) return fail(res, new Error('not found'), 404);
@@ -140,38 +145,40 @@ router.get('/api/workflow/candidates/:id', async (req, res, params) => {
   });
 });
 
-// Equivalent of "Submit Score" + "Branch on Result" + "Advance to
-// Interview"/"Archive Application" all in one call. The workflow does its
-// own scoring (its own Scoring Agent node calls its own LLM) and just posts
-// the result here; this endpoint decides pass/fail using HappyRecruiting's
-// pass_threshold and updates the local stage accordingly.
+// Equivalent of Ashby's "Change Application Stage" action: a dumb write.
+// This endpoint does NOT decide pass/fail — it only records whatever the
+// WORKFLOW already decided (the workflow reads pass_threshold itself from
+// /api/happyrecruiting/settings, compares it to the score with its own
+// Condition/Paths node, and tells us the outcome). This mirrors what real
+// Ashby can do: Ashby has no "judge this score" skill, only "move this
+// application to stage X" — so this dashboard is capped at the same skill,
+// on purpose, so the swap back to real Ashby later is a 1:1 node swap.
 // POST /api/workflow/candidates/:id/prescreen-result
-// body: { score: number, rationale: string }
+// body: { score: number, rationale: string, passed: boolean }
 router.post('/api/workflow/candidates/:id/prescreen-result', async (req, res, params) => {
   try {
     const candidate = db.getCandidate(params.id);
     if (!candidate) return fail(res, new Error('not found'), 404);
     const body = await readBody(req);
     if (typeof body.score !== 'number') return fail(res, new Error('score (number) is required'), 400);
+    if (typeof body.passed !== 'boolean') {
+      return fail(res, new Error('passed (boolean) is required — the workflow must decide this itself, this endpoint only records it'), 400);
+    }
 
-    const settings = await hr.getSettings();
-    const passThreshold = settings.pass_threshold ?? 8;
-    const passed = body.score >= passThreshold;
-
-    const evaluation = db.addEvaluation(candidate.id, 'prescreen', passed, {
+    const evaluation = db.addEvaluation(candidate.id, 'prescreen', body.passed, {
       score: body.score,
       rationale: body.rationale || null,
-      pass_threshold: passThreshold,
       source: 'real_workflow',
     });
-    const newStage = passed ? 'prescreen_passed' : 'prescreen_rejected';
+    const newStage = body.passed ? 'prescreen_passed' : 'prescreen_rejected';
     db.updateCandidateStage(candidate.id, newStage);
 
-    ok(res, { evaluation, stage: newStage, pass_threshold: passThreshold });
+    ok(res, { evaluation, stage: newStage });
   } catch (e) { fail(res, e); }
 });
 
-// Same pattern for the Agent Interview workflow, once we wire that one too.
+// Same pattern for the Agent Interview workflow — a dumb write, decision
+// already made by the workflow itself.
 // POST /api/workflow/candidates/:id/interview-result
 // body: { passed: boolean, rationale: string, question_results: [...] }
 router.post('/api/workflow/candidates/:id/interview-result', async (req, res, params) => {

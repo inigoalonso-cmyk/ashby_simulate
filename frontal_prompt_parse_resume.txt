@@ -1,9 +1,17 @@
-My dashboard's candidate objects now include an optional `resume_url` field alongside `profile_text` (real candidates will typically have `resume_url` pointing at a PDF/doc, since that's how they'll come from the actual export; `profile_text` will mostly be used for hand-typed test candidates). The current loop item's `candidate` variable will now include `candidate.resume_url` (string or null) in addition to the fields we already wired.
+Two changes needed in the Prescreening workflow, please show me the plan before building either:
 
-Please add back a file-parsing step in the Loop, right after we get the candidate, that:
-1. Only runs when `candidate.resume_url` is present (add a Paths/condition branching on whether it's set).
-2. If present, parses `candidate.resume_url` into text (use the same built-in Parse file action type we deleted earlier, just pointed at this new field instead of the old Ashby one).
-3. Feeds that parsed text into 'Format Criteria and Candidate' as `cv_text` instead of `candidate.profile_text`.
-4. If `resume_url` is NOT present, skip parsing and use `candidate.profile_text` as `cv_text` like it does now.
+1. File parsing for PDF résumés.
+The candidate objects from "List Candidates" now include an optional `resume_url` field alongside `profile_text` (real candidates will have `resume_url` pointing at a PDF, since that's how they'll come from the real export; `profile_text` is mostly for hand-typed test candidates).
+Add a step in the Loop, right after we get the candidate and before "Format Criteria and Candidate", that:
+  a. Branches (Paths/Condition) on whether `candidate.resume_url` is present.
+  b. If present: parses `candidate.resume_url` into text using the built-in Parse file action, and feeds that parsed text into "Format Criteria and Candidate" as `cv_text`.
+  c. If NOT present: skip parsing, use `candidate.profile_text` as `cv_text`, like it does now.
 
-Show me the plan before building it.
+2. The workflow must decide pass/fail itself, not the dashboard.
+I changed the dashboard's endpoint contract on purpose: `POST /api/workflow/candidates/{id}/prescreen-result` now REQUIRES a `passed` boolean in the body, and no longer computes it internally. Reasoning: this dashboard is a stand-in for Ashby, and Ashby has no "judge this score" skill — only "move this application to stage X". So the dashboard should only ever be told what to do, never decide. All decision logic must live in the workflow, the same place it will live once we point this back at real Ashby.
+Please add, right after the Scoring Agent and before "Submit Prescreen Result":
+  a. A step that reads `pass_threshold` from `GET https://uirecruitingplatform-production.up.railway.app/api/settings` (or wherever "Fetch Evaluation Config" already gets it from — reuse that call if it already includes pass_threshold, don't add a duplicate call).
+  b. A Condition/Paths node comparing the Scoring Agent's `score` output to `pass_threshold` (score >= pass_threshold → passed = true, else false).
+  c. Update "Submit Prescreen Result" to send `{"score": ..., "rationale": ..., "passed": true|false}` — the boolean coming from this new Condition node, not computed anywhere else.
+
+Show me both plans before building.
