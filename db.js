@@ -8,7 +8,13 @@ const fs = require('fs');
 const path = require('path');
 const { randomUUID: uuid } = require('crypto');
 
-const FILE = path.join(__dirname, 'dashboard.json');
+// Data lives on a Railway Volume mounted at DATA_DIR (falls back to the app
+// directory for local dev, where losing state on restart doesn't matter).
+// Without a real volume here, every redeploy/restart wipes this file, since
+// it's gitignored on purpose (it's runtime state, not source).
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+const FILE = path.join(DATA_DIR, 'dashboard.json');
 
 function load() {
   if (!fs.existsSync(FILE)) {
