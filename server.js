@@ -123,12 +123,20 @@ router.patch('/api/candidates/:id/stage', async (req, res, params) => {
 // here. The workflow must call "Get Candidate" per item to get the full
 // record (including the CV link), exactly like it will have to do against
 // real Ashby later. Do not add those fields back here.
-// GET /api/workflow/applications?stage=applied
+// GET /api/workflow/applications?stage=applied&limit=25
+// `limit` caps how many rows are returned so the workflow only ever pulls a
+// small batch per trigger — with a real 20k-candidate backlog, returning the
+// whole list would overwhelm the workflow platform. The batch limiting must
+// happen HERE at the source, not after the fetch, exactly like Ashby's own
+// paginated List Applications.
 router.get('/api/workflow/applications', async (req, res, params, query) => {
   const stage = query.get('stage') || 'applied';
-  const rows = db.listCandidates({ stage }).map((c) => ({
+  const limitRaw = query.get('limit');
+  const limit = limitRaw != null && limitRaw !== '' ? parseInt(limitRaw, 10) : null;
+  let rows = db.listCandidates({ stage }).map((c) => ({
     id: c.id, name: c.name, job_id: c.job_id, job_name: c.job_name, stage: c.stage,
   }));
+  if (Number.isFinite(limit) && limit >= 0) rows = rows.slice(0, limit);
   ok(res, rows);
 });
 
