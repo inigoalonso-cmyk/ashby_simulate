@@ -160,13 +160,17 @@ router.post('/api/workflow/candidates/:id/prescreen-result', async (req, res, pa
     const candidate = db.getCandidate(params.id);
     if (!candidate) return fail(res, new Error('not found'), 404);
     const body = await readBody(req);
-    if (typeof body.score !== 'number') return fail(res, new Error('score (number) is required'), 400);
+    // The workflow's AI Extract emits `score` as a string ("7"), which the raw
+    // JSON body then sends quoted, so coerce here instead of requiring a strict
+    // JSON number — webhook bodies commonly stringify numeric fields.
+    const score = Number(body.score);
+    if (!Number.isFinite(score)) return fail(res, new Error('score (number) is required'), 400);
     if (typeof body.passed !== 'boolean') {
       return fail(res, new Error('passed (boolean) is required — the workflow must decide this itself, this endpoint only records it'), 400);
     }
 
     const evaluation = db.addEvaluation(candidate.id, 'prescreen', body.passed, {
-      score: body.score,
+      score,
       rationale: body.rationale || null,
       source: 'real_workflow',
     });
